@@ -10,36 +10,39 @@ from keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.layers import Dense,Dropout,Activation,Flatten,Conv2D,MaxPooling2D
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.backend import set_image_data_format
+from sklearn import preprocessing
 from keras.layers import BatchNormalization
 import pickle
 
 
 X = pickle.load(open("X.pickle","rb"))
 y = pickle.load(open("y.pickle","rb"))
-
+labels = ['hard','hemo','normal','soft']
 
 X = X/255
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=20, test_size=0.1)
+X_train, X_rem, y_train, y_rem = train_test_split(X, y, random_state=20, test_size=0.2)
 
-
+X_valid, X_test, y_valid, y_test = train_test_split(X_rem, y_rem, test_size=0.5)
 
 y_test=to_categorical(y_test)
 y_train = to_categorical(y_train)
+y_valid=to_categorical(y_valid)
 
 X_train = X_train.reshape(-1,26,26,1)
 X_test = X_test.reshape(-1,26,26,1)
+X_valid = X_valid.reshape(-1,26,26,1)
 #y_test = y_test.reshape(-1,3)
 
 set_image_data_format('channels_last')
 print('X_train')
-print(X_train)
+print(X_train.shape)
 print('X_test')
-print(X_test)
+print(X_test.shape)
 print('y_train')
-print(y_train)
+print(y_train.shape)
 print('y_test')
-print(y_test)
+print(y_test.shape)
 
 X_train=tf.expand_dims(X_train, axis=-1)
 
@@ -96,7 +99,7 @@ filepath ="saved_models/weights-improvement-{epoch:02d}-{val_accuracy:.2f}.hdf5"
 checkpoint = ModelCheckpoint(filepath, monitor='val_accuracy', verbose=1, save_best_only=True, mode='max')
 callbacks_list = [checkpoint]
 
-history = model.fit(X_train, y_train, epochs=20, validation_data=(X_test, y_test), batch_size=32,callbacks=callbacks_list)
+history = model.fit(X_train, y_train, epochs=20, validation_data=(X_valid, y_valid), batch_size=32,callbacks=callbacks_list)
 
 #history = model.fit(
 #    train_generator,
@@ -135,8 +138,21 @@ from sklearn.metrics import confusion_matrix, accuracy_score, classification_rep
 cm = confusion_matrix(rounded_labels,rounded_predictions)
 print(cm)
 
-print(classification_report(rounded_labels, rounded_predictions, target_names=['hard', 'hemo', 'normal','soft']))
+print(classification_report(rounded_labels, rounded_predictions, target_names=['hard', 'hemo', 'normal','soft'],digits=4))
 
+_, results = model.evaluate(X_test, y_test, batch_size=16)
+print('Accuracy:', results*100,'%')
+
+print("Generating predictions for 5 samples")
+predictions = model.predict(X_test[:5])
+classes_x=np.argmax(predictions,axis=1)
+
+print("actuals:", np.argmax(y_test[:5],axis=1))
+print("predictions:", classes_x)
+for i in range(0,5):
+    k = int(np.argmax(y_test[i]))
+    print("actual:", labels[k])
+    print("predicted:",labels[classes_x[i]])
 
 #Pred = model.predict(X_test, batch_size=32)
 #Pred_Label = np.argmax(Pred, axis=1)
